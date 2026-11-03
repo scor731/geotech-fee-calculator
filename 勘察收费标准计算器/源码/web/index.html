@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>工程勘察收费标准计算器（2002）v1.0 by DK星爷</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="top">
+  <div class="brand">
+    <div class="logo">费</div>
+    <div>
+      <b>工程勘察收费标准计算器</b>
+      <span id="brandVer">v1.0 by DK星爷</span>
+    </div>
+  </div>
+  <div class="tfield"><label>工程名称</label><input id="mProject" placeholder="请输入工程名称" style="min-width:250px"></div>
+  <div class="tfield"><label>建设单位</label><input id="mOwner" placeholder="建设单位" style="min-width:170px"></div>
+  <div class="tfield"><label>勘察等级</label>
+    <select id="mGrade" class="mini">
+      <option>甲级</option><option>乙级</option><option>丙级</option>
+    </select>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="btnHelp" title="使用帮助" style="width:30px;padding:0;justify-content:center">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .9-1 1.6v.4"/><path d="M12 17h.01"/></svg>
+  </button>
+  <button class="btn" id="btnOpen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>打开</button>
+  <button class="btn" id="btnSave"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>保存</button>
+  <button class="btn pri" id="btnExport"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>导出 Excel</button>
+  <button class="btn" id="btnReport"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>生成报告</button>
+</div>
+
+<!-- 主体 -->
+<div class="main">
+  <!-- 左侧 -->
+  <aside class="side">
+    <div class="cap">计价模块</div>
+    <div class="nav on" data-mod="soil">
+      <svg viewBox="0 0 24 24"><path d="M12 3v6M12 9l-5 3v9M12 9l5 3v9"/><path d="M4 21h16"/></svg>
+      <span>工程勘察</span><span class="amt" id="navSoil"></span>
+    </div>
+    <div class="nav" data-mod="lab">
+      <svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6.5L5.5 18a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 9.5V3"/><path d="M7.5 14h9"/></svg>
+      <span>室内试验</span><span class="amt" id="navLab"></span>
+    </div>
+    <div class="nav" data-mod="geo">
+      <svg viewBox="0 0 24 24"><path d="M2 12h3l2-6 3 12 3-9 2 5h3"/><path d="M21 12h1"/></svg>
+      <span>工程物探</span><span class="amt" id="navGeo"></span>
+    </div>
+    <div class="nav" data-mod="other">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h5M9.5 14.5h5"/></svg>
+      <span>其他费用</span><span class="amt" id="navOther"></span>
+    </div>
+
+    <div class="quick">
+      <div class="st">工作量速览</div>
+      <div class="qrow"><span>钻孔 / 进尺</span><b id="qHoles">—</b></div>
+      <div class="qrow"><span>标贯 / 动探</span><b id="qSpt">—</b></div>
+      <div class="qrow"><span>取样 / 试验</span><b id="qLab">—</b></div>
+      <div class="qrow"><span>波速 / 电法</span><b id="qGeo">—</b></div>
+    </div>
+
+    <div class="sumcard">
+      <div class="st">费用汇总</div>
+      <table class="sumtb">
+        <thead><tr><th>分部</th><th class="num">实物(万)</th><th class="num">小计(万)</th></tr></thead>
+        <tbody id="sumRows"><tr><td colspan="3" class="ph">暂无数据</td></tr></tbody>
+      </table>
+      <div class="sline"><span>基准价</span><b id="sumBase">¥0.00</b></div>
+      <div class="sparams">
+        <label>下浮<input type="number" step="1" id="pDisc" value="0"><i>%</i></label>
+      </div>
+      <div class="sfin"><span>合同价</span><div class="v" id="sumFinal">¥0.00</div></div>
+    </div>
+  </aside>
+
+  <!-- 中栏 -->
+  <main class="center" id="center"></main>
+
+  <!-- 右栏 -->
+  <aside class="right">
+    <div class="rh">
+      <div class="t"><span class="dot"></span><span id="refTitle">收费标准对照</span></div>
+      <div class="s" id="refSub">国家计委、建设部《工程勘察设计收费标准》2002</div>
+      <div class="tabs" id="refTabs"></div>
+    </div>
+    <div class="rc" id="refBody"></div>
+  </aside>
+</div>
+
+<!-- 底栏 -->
+<div class="foot">
+  <span class="pill">计费依据：<b>计价格[2002]10号</b></span>
+  <span class="pill">钻孔 <b id="fHoles">0</b> 个 / <b id="fDepth">0</b> m</span>
+  <span class="pill">岩土类别 <b id="fLayers">0</b> 层</span>
+  <span class="spacer" style="flex:1"></span>
+  <span class="pill" id="fVer" title="软件版本">v1.0 by DK星爷</span>
+  <span class="pill" id="fStatus"><span class="ok">就绪</span></span>
+</div>
+
+<div class="mask" id="mask"><div class="box"><div class="spin"></div><span id="maskText">正在计算…</span></div></div>
+
+<div class="mask" id="dlgMask">
+  <div class="dialog">
+    <h3 id="dlgTitle">导出 Excel</h3>
+    <div class="f"><label>保存位置</label><div class="row"><input id="dlgDir" spellcheck="false"><button class="btn tiny" id="dlgOpen">打开</button></div></div>
+    <div class="f"><label>文件名</label><input id="dlgName" spellcheck="false"></div>
+    <div class="hint info" id="dlgTip" style="margin:10px 0 0">文件将按默认位置保存，也可修改路径（如 D:\预算）。</div>
+    <div class="acts">
+      <button class="btn" id="dlgCancel">取消</button>
+      <button class="btn pri" id="dlgOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="mask" id="helpMask">
+  <div class="dialog" style="width:660px">
+    <h3>使用说明 · 计费要点</h3>
+    <div class="help">
+      <div class="hs">① 录入顺序</div>
+      <p>「工程勘察」模块 →「人工录入」：先填标准地层（层号自动延续、名称可下拉选择、类别自动带出），
+      再设钻孔总数并按一半分配控制孔，然后填标贯、动探、取样；结算项目可点「导入理正备份库」按钮，
+      读取理正备份库（.mdb/.accdb）或导出的 Excel，实测数据会直接填入下方标准地层、钻孔、标贯、动探与取样，可继续修改。</p>
+      <div class="hs">② 取费公式（总则 1.0.4）</div>
+      <div class="code">勘察收费 = 基准价 × (1 ± 浮动幅度)　（本软件以下浮幅度体现）
+基准价   = 实物工作收费 + 技术工作收费
+实物工作收费 = 收费基价 × 实物工作量 × 附加调整系数
+技术工作收费 = 实物工作收费 × 技术工作费比例</div>
+      <div class="hs">③ 附加调整系数不连乘（总则 1.0.8）</div>
+      <p>两个以上系数相加、减去系数个数、再加 1。例：跟管钻进 1.5 + 夜间 1.2 → 1.5+1.2−2+1 = <b>1.70</b>。</p>
+      <div class="hs">④ 技术工作费比例</div>
+      <p>岩土工程勘察：甲级 120%、乙级 100%、丙级 80%；工程物探 22%；室内试验 10%；工程测量 22%。</p>
+      <div class="hs">⑤ 钻孔计价规则</div>
+      <p>按岩土类别（Ⅰ~Ⅵ）与深度档（每 10m 一档，60~100m 两档）分别取价；同一层跨深度档时自动拆分。
+      深度 &gt;100m 每增 20m 按前一档 ×1.2。</p>
+      <div class="hs">⑥ 导出与报告</div>
+      <p>「导出 Excel」生成费用计算书、工作量清单、分层明细三张表；「生成报告」输出 Word 版预算/结算报告
+      （工程概况、计价依据、工作量统计、费用明细、费用统计表）；「保存」生成 .kcsj 项目文件可再次打开。</p>
+      <div class="hs">⑦ 版本</div>
+      <p id="helpVer">工程勘察收费标准计算器（2002 修订本）v1.0 by DK星爷</p>
+    </div>
+    <div class="acts"><button class="btn pri" id="helpClose">知道了</button></div>
+  </div>
+</div>
+<input type="file" id="fileLz" accept=".xls,.xlsx,.mdb,.accdb,.csv,.zip,.bak" style="display:none">
+<input type="file" id="filePrj" accept=".kcsj" style="display:none">
+
+<script>
+/* 脚本异常兜底提示，便于定位运行环境问题 */
+window.addEventListener('error', function (e) {
+  try {
+    var t = e.target;
+    var msg = t && t.tagName === 'SCRIPT' ? ('脚本加载失败：' + (t.src || '')) : ('脚本错误：' + (e.message || '') + ' ' + (e.lineno ? ('第' + e.lineno + '行') : ''));
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#FDECEC;color:#B3261E;padding:10px 14px;border-radius:8px;font-size:12px;z-index:9999;max-width:80vw;white-space:pre-wrap;box-shadow:0 6px 20px rgba(0,0,0,.12)';
+    d.textContent = msg;
+    document.body.appendChild(d);
+  } catch (x) { }
+}, true);
+</script>
+<script src="app.js"></script>
+</body>
+</html>
