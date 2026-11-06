@@ -1,7 +1,7 @@
 VSVersionInfo(
     ffi=FixedFileInfo(
-        filevers=(1, 0, 0, 0),
-        prodvers=(1, 0, 0, 0),
+        filevers=(1, 1, 0, 0),
+        prodvers=(1, 1, 0, 0),
         mask=0x3F,
         flags=0x0,
         OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
                 [
                     StringStruct("CompanyName", "DK星爷"),
                     StringStruct("FileDescription", "工程勘察收费标准计算器（2002 修订本）"),
-                    StringStruct("FileVersion", "1.0"),
+                    StringStruct("FileVersion", "1.1"),
                     StringStruct("InternalName", "kcsj2002"),
                     StringStruct("LegalCopyright", "\u00a9 DK星爷"),
                     StringStruct("OriginalFilename", "工程勘察收费标准计算器.exe"),
                     StringStruct("ProductName", "工程勘察收费标准计算器"),
-                    StringStruct("ProductVersion", "v1.0 by DK星爷"),
+                    StringStruct("ProductVersion", "v1.1 by DK星爷"),
                 ],
             )
         ]),

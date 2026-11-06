@@ -20,11 +20,12 @@ def num(v, default=0.0):
 
 def combine_coef(values):
     """附加调整系数合成规则（总则1.0.8）：不能连乘。
-    系数相加，减去系数个数，加上定值1。  即 1 + Σ(v-1)"""
+    系数相加，减去系数个数，加上定值1。  即 1 + Σ(v-1)；
+    收费不可能为负，合成结果以 0 为下限（防御性保护，正常勾选不会触发）。"""
     vals = [v for v in values if v and abs(v - 1) > 1e-9]
     if not vals:
         return 1.0
-    return round(1 + sum(v - 1 for v in vals), 4)
+    return max(round(1 + sum(v - 1 for v in vals), 4), 0.0)
 
 
 def cuts_for(base, tail_start, tail_step, maxd):
@@ -92,8 +93,12 @@ def build_holes(state):
                         "depth": num(h.get("depth"), top), "segs": segs})
         return out
 
-    layers = [L for L in (state.get("layers") or []) if num(L.get("bottom")) > 0]
+    # 最后一层默认「无穷」：层底深不填（0 / 空）表示该层延伸至孔底，不必逐层填深度。
+    # 有限层按层底排序在前，无限层排在最后（只有第一个无限层会填充到孔底）。
+    raw_layers = list(state.get("layers") or [])
+    layers = [L for L in raw_layers if num(L.get("bottom")) > 0]
     layers.sort(key=lambda x: num(x.get("bottom")))
+    layers += [L for L in raw_layers if num(L.get("bottom")) <= 0]
     out = []
     for ht in state.get("holeTypes") or []:
         cnt = int(num(ht.get("count"), 0))
@@ -105,14 +110,22 @@ def build_holes(state):
             top = 0.0
             for L in layers:
                 bot = num(L.get("bottom"))
+                unbounded = bot <= 0        # 最后一层：层底无穷
+                if unbounded:
+                    bot = depth
                 if bot <= top:
                     continue
                 e = min(bot, depth)
                 if e - top > 1e-9:
-                    segs.append({"code": L.get("code", ""), "name": L.get("name", ""),
+                    # 层号带亚层：主层编号 + "-" + 亚层编号，导出时再转 ①1
+                    code = str(L.get("code") or "")
+                    sub = str(L.get("sub") or "").strip()
+                    if sub:
+                        code = (code + "-" + sub) if code else sub
+                    segs.append({"code": code, "name": L.get("name", ""),
                                  "cls": int(num(L.get("cls"), 1)), "top": top, "bot": e})
                 top = bot
-                if top >= depth - 1e-9:
+                if unbounded or top >= depth - 1e-9:
                     break
             no = "%s-%d" % (ht.get("name", "孔"), i + 1)
             out.append({"no": no, "type": ht.get("name", "钻孔"), "depth": depth, "segs": segs})
@@ -155,11 +168,18 @@ def compute(state):
     res = {"sections": [], "holes": [], "warnings": []}
 
     # ---------- 系数 ----------
+    # 附加调整系数分两类作用范围（总则1.0.8「相应的实物工作收费」）：
+    #   drill = 仅作用于钻探进尺（跟管钻进、斜孔等工艺系数，不放大取样/原位测试）
+    #   field = 作用于现场实物工作（夜间、水上、地形复杂等作业条件系数）
     all_coefs = {c["id"]: c for c in S.COEF_SOIL}
     all_coefs.update({c["id"]: c for c in S.COEF_GLOBAL})
-    sel = [all_coefs[i]["v"] for i in (state.get("coefSoil") or []) if i in all_coefs]
-    sel += [all_coefs[i]["v"] for i in (state.get("coefGlobal") or []) if i in all_coefs]
-    k_soil = combine_coef(sel)
+    soil_ids = list(state.get("coefSoil") or [])
+    glob_ids = list(state.get("coefGlobal") or [])
+    drill_ids = [i for i in soil_ids if all_coefs.get(i, {}).get("scope") == "drill"]
+    field_ids = [i for i in soil_ids + glob_ids if i not in drill_ids]
+    k_drill = combine_coef([all_coefs[i]["v"] for i in field_ids + drill_ids if i in all_coefs])
+    k_field = combine_coef([all_coefs[i]["v"] for i in field_ids if i in all_coefs])
+    k_soil = k_drill  # 勘探（钻孔/探井）用
 
     geo_coefs = {c["id"]: c for c in S.COEF_GEO}
     gsel = [geo_coefs[i]["v"] for i in (state.get("coefGeo") or []) if i in geo_coefs]
@@ -167,6 +187,9 @@ def compute(state):
 
     holes = build_holes(state)
     res["holes"] = holes
+
+    # 技术工作费归属：survey = 与勘察一并完成（按勘察比例）；standalone = 独立委托
+    att = state.get("techAttach") or {}
 
     # ================= 1 岩土工程勘察 =================
     sec1 = {"key": "soil", "title": "一、岩土工程勘察", "groups": [], "amount": 0.0}
@@ -230,17 +253,18 @@ def compute(state):
         label = next((r["label"] for r in S.TABLES["sample"]["rows"] if r["key"] == dev), dev)
         lines.append({"item": "取原状土样", "sub": label, "spec": "取样深度≤30m" if band == 0 else "取样深度>30m",
                       "unit": "件", "price": price, "qty": cnt, "amount": round(price * cnt, 2),
-                      "coef": k_soil, "total": round(price * cnt * k_soil, 2)})
+                      "coef": k_field, "total": round(price * cnt * k_field, 2)})
     for key, label, tid, unit in (("disturb", "扰动取土", "disturb", "件"),
-                                  ("core", "取岩芯样", "core", "件"),
+                                  ("core", "取岩芯样（天然抗压）", "core", "件"),
+                                  ("coreSat", "取岩芯样（饱和抗压）", "core", "件"),
                                   ("point", "取点荷载岩样", "point", "块"),
                                   ("water", "取水", "water", "件")):
         c = num(sm.get(key))
         if c > 0:
             price = S.row_price("sample_extra", tid, 0) or 0
             lines.append({"item": label, "sub": "", "spec": "", "unit": unit, "price": price,
-                          "qty": c, "amount": round(price * c, 2), "coef": k_soil,
-                          "total": round(price * c * k_soil, 2)})
+                          "qty": c, "amount": round(price * c, 2), "coef": k_field,
+                          "total": round(price * c * k_field, 2)})
     if lines:
         sec1["groups"].append({"key": "sample", "title": "取样", "lines": lines})
         detail += lines
@@ -264,7 +288,7 @@ def compute(state):
         lines.append({"item": "标准贯入试验", "sub": cls_list[cls - 1],
                       "spec": "%s  %s" % (it.get("layerName", ""), lab), "unit": "次",
                       "price": price, "qty": c, "amount": round(price * c, 2),
-                      "coef": k_soil, "total": round(price * c * k_soil, 2)})
+                      "coef": k_field, "total": round(price * c * k_field, 2)})
     # 动力触探
     for it in state.get("dpt") or []:
         c = num(it.get("meters"))
@@ -287,7 +311,7 @@ def compute(state):
         nm = {"dpt_light": "轻型动力触探", "dpt_heavy": "重型动力触探", "dpt_super": "超重型动力触探"}[tid]
         lines.append({"item": nm, "sub": cname, "spec": "%s  %s" % (it.get("layerName", ""), lab),
                       "unit": "m", "price": price, "qty": c, "amount": round(price * c, 2),
-                      "coef": k_soil, "total": round(price * c * k_soil, 2)})
+                      "coef": k_field, "total": round(price * c * k_field, 2)})
     # 静力触探 / 十字板 / 压水 / 载荷
     for it in state.get("otherTest") or []:
         c = num(it.get("qty"))
@@ -314,7 +338,17 @@ def compute(state):
             price = S.price_at("vane", depth, 0) or 0
             nm, unit, spec = "十字板剪切试验", "点", ""
         elif kind == "packer":
-            sub = it.get("sub", "pack_le20")
+            # 定档口径与界面 packSubOf 一致：有 ptype 时按 压水深度(D≤20/D>20) 或注水类型定档；
+            # 旧项目只有 sub 的直接信任 sub（v2.1 以前保存的状态）
+            ptype = it.get("ptype")
+            if not ptype:
+                sub = it.get("sub", "pack_le20")
+            elif ptype == "inj_hole":
+                sub = "inj_hole"
+            elif ptype == "inj_pit":
+                sub = "inj_pit"
+            else:
+                sub = "pack_gt20" if num(it.get("depth")) > 20 else "pack_le20"
             price = S.row_price("packer", sub, 0) or 0
             nm = "压水/注水试验"
             unit = "段次"
@@ -330,11 +364,13 @@ def compute(state):
         amt = price * mult * c
         lines.append({"item": nm, "sub": "", "spec": spec, "unit": unit,
                       "price": round(price * mult, 2), "qty": c, "amount": round(amt, 2),
-                      "coef": k_soil, "total": round(amt * k_soil, 2)})
+                      "coef": k_field, "total": round(amt * k_field, 2)})
     if lines:
         sec1["groups"].append({"key": "insitu", "title": "原位测试", "lines": lines})
         detail += lines
 
+    # 1.5 勘探点定位测量已移至「其他费用」分部（见第 4 节），
+    #     仍是岩土工程勘察的实物工作，技术工作费默认按勘察比例计取。
     soil_real = sum(l["total"] for l in detail)
 
     # 原位测试数量校验：标贯次数不大于钻孔总数 1/3 时提示
@@ -348,12 +384,13 @@ def compute(state):
             % (spt_total, n_holes, spt_min))
 
     rate = S.TECH_RATE["岩土工程勘察"].get(state.get("grade", "甲级"), 1.0)
-    tech1 = soil_real * rate
     sec1["real"] = round(soil_real, 2)
-    sec1["tech"] = round(tech1, 2)
+    sec1["ownReal"] = round(soil_real, 2)
+    sec1["tech"] = 0.0
     sec1["techRate"] = rate
-    sec1["amount"] = round(soil_real + tech1, 2)
+    sec1["amount"] = round(soil_real, 2)
     sec1["coef"] = k_soil
+    sec1["coefField"] = k_field
     res["sections"].append(sec1)
 
     # ================= 2 室内试验 =================
@@ -374,18 +411,17 @@ def compute(state):
         sec2["groups"].append({"key": "lab", "title": "室内试验项目", "lines": lines})
     lab_real = sum(l["total"] for l in lines)
     lrate = S.TECH_RATE["室内试验"].get(state.get("grade", "甲级"), 0.1)
-    sec2["real"] = round(lab_real, 2)
-    sec2["tech"] = round(lab_real * lrate, 2)
-    sec2["techRate"] = lrate
-    sec2["amount"] = round(lab_real * (1 + lrate), 2)
     if state.get("labInSite"):
         sec2["note"] = "移至现场进行的室内试验，附加调整系数1.3（表8.5）"
-        sec2["real"] = round(lab_real * 1.3, 2)
-        sec2["tech"] = round(lab_real * 1.3 * lrate, 2)
-        sec2["amount"] = round(lab_real * 1.3 * (1 + lrate), 2)
+        lab_real = lab_real * 1.3
         for l in lines:
             l["coef"] = 1.3
             l["total"] = round(l["amount"] * 1.3, 2)
+    sec2["real"] = round(lab_real, 2)
+    sec2["workReal"] = round(lab_real, 2)
+    sec2["tech"] = 0.0
+    sec2["techRate"] = lrate
+    sec2["amount"] = round(lab_real, 2)
     res["sections"].append(sec2)
 
     # ================= 3 工程物探 =================
@@ -393,7 +429,7 @@ def compute(state):
     lines = []
     geo = state.get("geo") or {}
     wv = geo.get("wave") or {}
-    # 孔深不由用户填写，统一取本项目最深孔
+    # 每孔测试深度的默认值＝本项目最深孔；用户填了值就按填写值定档（不一定是孔深）
     wdepth = max([h["depth"] for h in holes] or [0]) or num(wv.get("depth"))
     qm = state.get("qtyMode") or ("lz" if (state.get("holes") or []) else "manual")
     method = 1 if wv.get("method") == "cross" else 0
@@ -423,9 +459,12 @@ def compute(state):
         spec_head = "勾选 %d 孔，按各孔孔深分档计价" % n_hole
     else:
         n_hole = int(num(wv.get("holes")))
+        # 每孔测试深度：默认取本项目最深孔；用户填写后按填写值，深度档也随之按它判定
         test_len = num(wv.get("testLen")) or wdepth
         qty = n_hole * test_len
         spec_head = "%d孔×%.2fm" % (n_hole, test_len)
+        if test_len > 0:
+            wdepth = test_len
     if n_hole > 0 and wdepth > 0:
         if bands:
             for b in bands:
@@ -433,7 +472,7 @@ def compute(state):
                               "spec": "%s（%d孔 %.2fm）" % (b["label"], b["holes"], b["meters"]),
                               "unit": "m", "price": b["price"], "qty": b["meters"],
                               "amount": b["amount"], "coef": k_geo,
-                              "total": round(b["amount"] * k_geo, 2)})
+                              "total": round(b["amount"] * k_geo, 2), "part": "wave"})
         else:
             price = S.price_at("wave", wdepth, method) or 0
             bands = [{"label": wave_band(wdepth)[0], "price": round(price, 2),
@@ -443,15 +482,23 @@ def compute(state):
                           "spec": "%s；%s" % (spec_head, wave_band(wdepth)[0]),
                           "unit": "m", "price": round(price, 2), "qty": round(qty, 2),
                           "amount": round(price * qty, 2), "coef": k_geo,
-                          "total": round(price * qty * k_geo, 2)})
+                          "total": round(price * qty * k_geo, 2), "part": "wave"})
         res["waveDepth"] = round(wdepth, 2)
         res["waveBands"] = bands
         res["waveMeters"] = round(qty, 2)
         res["waveHoles"] = n_hole
-        # 不足 2 个组日
+        # 不足 2 个组日：按 2 个组日（2000 元）计取，差额补入实物工作费（表7.2-1 注）
         group_min = 2 * 1000
-        if sum(l["amount"] for l in lines) < group_min and wv.get("minGroup", True):
-            res["warnings"].append("钻孔波速测试收费不足2个组日，按2个组日（%d元）计取。" % group_min)
+        wave_now = sum(l["total"] for l in lines)
+        if wave_now < group_min and wv.get("minGroup", True):
+            add = round(group_min - wave_now, 2)
+            lines.append({"item": "钻孔波速测试", "sub": "最低 2 个组日补差",
+                          "spec": "不足 2 个组日按 2 个组日计", "unit": "项",
+                          "price": add, "qty": 1, "amount": add, "coef": 1.0,
+                          "total": add, "part": "wave", "minAdd": True})
+            res["waveMinAdd"] = add
+            res["warnings"].append(
+                "钻孔波速测试实物工作费 %.2f 元，不足 2 个组日，已补差 %.2f 元，按 2000 元计取。" % (wave_now, add))
 
     # 电法（两种计价方式：按电极距 L / 按测点距 L，各对应表7.2-1 的一张子表）
     for it in geo.get("elec") or []:
@@ -501,21 +548,52 @@ def compute(state):
                       "unit": it.get("unit", ""), "price": price, "qty": qty,
                       "amount": round(price * qty, 2), "coef": k_geo,
                       "total": round(price * qty * k_geo, 2)})
-    if lines:
-        sec3["groups"].append({"key": "geo", "title": "物探项目", "lines": lines})
-    geo_real = sum(l["total"] for l in lines)
+    wave_lines = [l for l in lines if l.get("part") == "wave"]
+    geo_lines = [l for l in lines if l.get("part") != "wave"]
+    if wave_lines:
+        sec3["groups"].append({"key": "wave", "title": "钻孔波速测试", "lines": wave_lines})
+    if geo_lines:
+        sec3["groups"].append({"key": "geo", "title": "物探项目", "lines": geo_lines})
+    geo_all = sum(l["total"] for l in lines)
+    wave_real = sum(l["total"] for l in wave_lines)
+    res["waveReal"] = round(wave_real, 2)
     grate = S.TECH_RATE["工程物探"].get(state.get("grade", "甲级"), 0.22)
-    sec3["real"] = round(geo_real, 2)
-    sec3["tech"] = round(geo_real * grate, 2)
+    sec3["real"] = round(geo_all, 2)
+    sec3["workReal"] = round(geo_all, 2)
+    sec3["waveReal"] = round(wave_real, 2)
+    sec3["geoReal"] = round(geo_all - wave_real, 2)
+    sec3["tech"] = 0.0
     sec3["techRate"] = grate
-    sec3["amount"] = round(geo_real * (1 + grate), 2)
+    sec3["amount"] = round(geo_all, 2)
     sec3["coef"] = k_geo
     res["sections"].append(sec3)
 
     # ================= 4 其他费用 =================
     sec4 = {"key": "other", "title": "四、其他费用", "groups": [], "amount": 0.0}
-    lines = []
     oth = state.get("other") or {}
+    grade = state.get("grade", "甲级")
+
+    # 4.1 勘探点定位测量（总则1.0.13 工程测量 1000 元/组日）
+    # 在本分部单独统计；技术工作费默认按岩土工程勘察比例计取
+    # （《使用手册》第3章技术费公式中「勘探点定位测量」属勘察基数），
+    # 独立委托时可切换为工程测量 22%。
+    coord_lines = []
+    coord_st = state.get("coord") or {}
+    cdays = num(coord_st.get("days"))
+    cprice = S.COORD_ITEM["price"]        # 总则1.0.13 固定 1000 元/组日，不接受用户改价
+    if cdays <= 0:                     # 兼容旧项目：定点测量原放在「其他费用」里
+        cdays = num(oth.get("survey"))
+    if cdays > 0:
+        coord_lines = [{
+            "item": "勘探点定位测量", "sub": "", "spec": "工程测量（总则1.0.13）",
+            "unit": "组日", "price": round(cprice, 2), "qty": round(cdays, 2),
+            "amount": round(cprice * cdays, 2), "coef": 1.0,
+            "total": round(cprice * cdays, 2),
+        }]
+        sec4["groups"].append({"key": "coord", "title": "勘探点定位测量", "lines": coord_lines})
+
+    # 4.2 其他费用（台班 / 验槽 / 报告费 / 预留增项，不计技术工作费）
+    lines = []
     for oi in S.OTHER_ITEMS:
         q = num(oth.get(oi["id"]))
         if q <= 0:
@@ -534,19 +612,176 @@ def compute(state):
                       "amount": round(pr * q, 2), "coef": 1.0, "total": round(pr * q, 2)})
     if lines:
         sec4["groups"].append({"key": "other", "title": "其他费用", "lines": lines})
-    sec4["real"] = round(sum(l["total"] for l in lines), 2)
-    sec4["tech"] = 0.0
-    sec4["techRate"] = 0.0
-    sec4["amount"] = sec4["real"]
+
+    coord_attach = (att.get("coord") or "survey") != "standalone"
+    crate = sec1["techRate"] if coord_attach else S.TECH_RATE["工程测量"].get(grade, 0.22)
+    coord_real = round(sum(l["total"] for l in coord_lines), 2)
+    all_real = round(sum(l["total"] for l in coord_lines + lines), 2)
+    sec4["real"] = all_real
+    sec4["workReal"] = all_real
+    sec4["coordReal"] = coord_real
+    sec4["techRate"] = round(crate, 4) if coord_real > 0 else 0.0
+    sec4["techBase"] = coord_real
+    sec4["tech"] = round(coord_real * crate, 2) if coord_real > 0 else 0.0
+    sec4["amount"] = round(all_real + sec4["tech"], 2)
+    sec4["coordAttach"] = bool(coord_attach)
+    if coord_real > 0:
+        sec4["techBasis"] = ("勘探点定位测量随勘察委托，按勘察 %s 比例" % grade) if coord_attach \
+            else "工程测量独立委托 22%"
+        sec4["techLabel"] = ("技术工作费（勘探点定位测量，按勘察 %d%%）" % round(crate * 100)) if coord_attach \
+            else ("技术工作费（勘探点定位测量独立委托，按工程测量 %d%%）" % round(crate * 100))
     res["sections"].append(sec4)
 
+    # ================= 技术工作费：各分部各自计取，最后相加 =================
+    # 依据《使用手册》第3章：与勘察一并完成的室内试验、钻孔波速、勘探点定位测量，
+    # 技术工作费按「岩土工程勘察」技术工作费比例计取；但各分部独立统计、独立列示、
+    # 独立计入基准价，不并入「岩土工程勘察」分部，避免出现分部小计为 0 的漏斗式汇总。
+    # 只有独立委托、单独提交成篇报告时，才分别按室内试验 10%、工程物探 22% 单独计取。
+    sr = sec1["techRate"]
+
+    # 1 岩土工程勘察：仅按本分部实物工作费计取
+    sec1["real"] = round(sec1["ownReal"], 2)
+    sec1["techBase"] = sec1["real"]
+    sec1["tech"] = round(sec1["real"] * sr, 2)
+    sec1["amount"] = round(sec1["real"] + sec1["tech"], 2)
+    sec1["techLabel"] = "技术工作费（%d%%）" % round(sr * 100)
+    sec1["techBasis"] = "岩土工程勘察 %s，第一章 1.0.6 条" % grade
+
+    # 2 室内试验：与勘察一并完成 → 按勘察比例；独立委托 → 10%
+    lab_work = round(num(sec2.get("workReal")), 2)
+    lab_attach = (att.get("lab") or "survey") != "standalone"
+    lrate = sr if lab_attach else S.TECH_RATE["室内试验"].get(grade, 0.10)
+    sec2["real"] = lab_work
+    sec2["techBase"] = lab_work
+    sec2["techRate"] = round(lrate, 4)
+    sec2["tech"] = round(lab_work * lrate, 2)
+    sec2["amount"] = round(lab_work + sec2["tech"], 2)
+    sec2["attach"] = "survey" if lab_attach else "standalone"
+    sec2["techLabel"] = ("技术工作费（按勘察 %d%% 计取）" % round(lrate * 100)) if lab_attach \
+        else ("技术工作费（独立委托，按室内试验 %d%% 计取）" % round(lrate * 100))
+    sec2["techBasis"] = ("室内试验随勘察一并委托，按勘察 %s 比例" % grade) if lab_attach else "室内试验独立委托"
+
+    # 3 工程物探：钻孔波速（与勘察一并完成）按勘察比例，其他物探按 22%
+    wave_work = round(num(sec3.get("waveReal")), 2)
+    geo_work = round(num(sec3.get("geoReal")), 2)
+    wave_attach = (att.get("wave") or "survey") != "standalone"
+    grate = S.TECH_RATE["工程物探"].get(grade, 0.22)
+    wrate = sr if wave_attach else grate
+    wave_tech = round(wave_work * wrate, 2)
+    geo_tech = round(geo_work * grate, 2)
+    sec3["real"] = round(wave_work + geo_work, 2)
+    sec3["techBase"] = sec3["real"]
+    sec3["tech"] = round(wave_tech + geo_tech, 2)
+    sec3["amount"] = round(sec3["real"] + sec3["tech"], 2)
+    sec3["waveRate"] = round(wrate, 4)
+    sec3["geoRate"] = round(grate, 4)
+    sec3["waveTech"] = wave_tech
+    sec3["geoTech"] = geo_tech
+    sec3["attach"] = "survey" if wave_attach else "standalone"
+    parts = []
+    if wave_work > 0:
+        parts.append({"key": "wave", "name": "钻孔波速测试", "real": wave_work,
+                      "rate": round(wrate, 4), "tech": wave_tech,
+                      "label": ("按勘察 %d%%" % round(wrate * 100)) if wave_attach
+                               else ("独立委托 %d%%" % round(wrate * 100))})
+    if geo_work > 0:
+        parts.append({"key": "geo", "name": "其他物探", "real": geo_work,
+                      "rate": round(grate, 4), "tech": geo_tech,
+                      "label": "工程物探 %d%%" % round(grate * 100)})
+    sec3["rateParts"] = parts
+    sec3["techRate"] = parts[0]["rate"] if len(parts) == 1 else (
+        round(grate, 4) if geo_work > 0 else round(wrate, 4))
+    sec3["techLabel"] = "技术工作费" + (
+        "（%s）" % "；".join("%s %s" % (p["name"], p["label"]) for p in parts) if parts else "")
+
+    res["techAttach"] = {"lab": "survey" if lab_attach else "standalone",
+                         "wave": "survey" if wave_attach else "standalone",
+                         "coord": "survey" if coord_attach else "standalone",
+                         "labRate": round(lrate, 4), "waveRate": round(wrate, 4),
+                         "coordRate": round(crate, 4)}
+
+    # ================= 5 工程测量 =================
+    # 第二章：技术工作费比例 22%（2.1）；复杂程度分简单/中等/复杂三档（表2.2-1 等），
+    # 附加调整系数按《使用手册》对表2.2-3 的解释逐条匹配到对应项目（序号1~2→三角(边)、
+    # 3→房顶标志(三角)/墙上水准(水准)、4/6~7→导线、5→GPS、8~14→地形测量…），
+    # 同一项目上叠加多条系数时按总则1.0.8「相加－个数＋1」合成，不连乘；总则系数作用于全部项目。
+    # 本分部独立统计并计入基准价。
+    sec5 = {"key": "survey", "title": "五、工程测量", "groups": [], "amount": 0.0}
+    sv = state.get("survey") or {}
+    sbook = {c["id"]: c for c in S.SURVEY_COEF}
+    ssel = [i for i in (sv.get("coefs") or []) if i in sbook]
+
+    def s_applied(fam):
+        """某个测量项目族实际生效的系数条目（表2.2-3 按 to 匹配，总则系数 to=["*"] 作用于全部）"""
+        return [sbook[i] for i in ssel
+                if fam in (sbook[i].get("to") or []) or "*" in (sbook[i].get("to") or [])]
+
+    def s_coef(fam):
+        """该族的附加调整系数：生效条目按总则1.0.8 合成（相加－个数＋1，不连乘）"""
+        return combine_coef([c["v"] for c in s_applied(fam)])
+
+    sgroups = {}
+    sorder = []
+    for row in sv.get("items") or []:
+        it = S.SURVEY_ITEM_MAP.get(row.get("id"))
+        if not it:
+            continue
+        qty = num(row.get("qty"))
+        price = num(row.get("price"))
+        if qty <= 0:
+            continue
+        ci = min(max(int(num(row.get("complex"), 1)), 0), 2)
+        if price <= 0:
+            price = it["vals"][ci]
+        spec = S.SURVEY_COMPLEX[ci]
+        if it["id"] == "small" and qty < 3:      # 表2.6-1 序号4：不足3个组日按3个组日计
+            res["warnings"].append("小型工程测量 %.2f 个组日，不足 3 个组日，已按 3 个组日计取。" % qty)
+            qty = 3.0
+            spec += "；不足3组日按3组日"
+        fam = S.SURVEY_ITEM_FAM.get(it["id"], it["grp"])
+        k = s_coef(fam)
+        # 生效系数的工程量提示（如「修测按实际修测面积填」「汇水面积按汇水面积填」）写进规格，
+        # 导出 Excel / Word 的「规格 / 说明」列可直接看到取价依据
+        hints = [c["hint"] for c in s_applied(fam) if c.get("hint")]
+        if hints:
+            spec += "；" + "；".join(hints)
+        line = {"item": it["name"], "sub": "", "spec": spec, "unit": it["unit"],
+                "price": round(price, 2), "qty": round(qty, 2),
+                "amount": round(price * qty, 2), "coef": k,
+                "hint": "；".join(hints),
+                "total": round(price * qty * k, 2)}
+        if it["grp"] not in sgroups:
+            gname = next((g["name"] for g in S.SURVEY_GROUPS if g["key"] == it["grp"]), it["grp"])
+            sgroups[it["grp"]] = {"key": it["grp"], "title": gname, "lines": []}
+            sorder.append(it["grp"])
+        sgroups[it["grp"]]["lines"].append(line)
+
+    for gk in sorder:
+        sec5["groups"].append(sgroups[gk])
+    sv_lines = [l for g in sec5["groups"] for l in g["lines"]]
+    sv_real = round(sum(l["total"] for l in sv_lines), 2)
+    srate = S.TECH_RATE["工程测量"].get(grade, 0.22)
+    sec5["real"] = sv_real
+    sec5["workReal"] = sv_real
+    sec5["techBase"] = sv_real
+    sec5["techRate"] = round(srate, 4)
+    sec5["tech"] = round(sv_real * srate, 2)
+    sec5["amount"] = round(sv_real + sec5["tech"], 2)
+    sec5["techLabel"] = "技术工作费（工程测量 %d%%）" % round(srate * 100)
+    sec5["techBasis"] = "工程测量，第二章 2.1 条"
+    sec5["coefByFam"] = {f["id"]: round(s_coef(f["id"]), 4) for f in S.SURVEY_FAMILIES}
+    sec5["itemCount"] = len(sv_lines)
+    res["sections"].append(sec5)
+
     # ================= 汇总 =================
+    # 五个分部（勘察 / 室内试验 / 工程物探 / 其他费用 / 工程测量）各自统计，小计相加即基准价
     base = sum(s["amount"] for s in res["sections"])
     coord = 0.0
     float_pct = num(state.get("float"))
     discount = num(state.get("discount"))
     after_float = (base + coord) * (1 + float_pct / 100.0)
     final = after_float * (1 - discount / 100.0)
+    total_depth = round(sum(num(h.get("depth")) for h in holes), 2)
     res["totals"] = {
         "base": round(base, 2),
         "coord": round(coord, 2),
@@ -554,6 +789,8 @@ def compute(state):
         "afterFloat": round(after_float, 2),
         "discountPct": discount,
         "final": round(final, 2),
+        "depth": total_depth,
+        "unitPrice": round(final / total_depth, 2) if total_depth > 0 else 0.0,
     }
     res["grades"] = list(S.TECH_RATE["岩土工程勘察"].keys())
     return res

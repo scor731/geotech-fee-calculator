@@ -178,7 +178,7 @@ class Api:
 
     def app_info(self):
         return {
-            "version": "1.0.0",
+            "version": V.APP_VERSION,
             "exe": sys.executable,
             "frozen": bool(getattr(sys, "frozen", False)),
             "dir": self.last_dir,
@@ -285,15 +285,24 @@ if __name__ == "__main__":
             state = {
                 "meta": {"project": "自检工程", "owner": "自检", "unit": "自检"},
                 "grade": "甲级",
-                "layers": [{"code": "①", "name": "素填土", "cls": 1, "bottom": 2},
-                           {"code": "②", "name": "圆砾", "cls": 3, "bottom": 18}],
+                "layers": [{"code": "1", "name": "素填土", "cls": 1, "bottom": 2},
+                           {"code": "2", "name": "圆砾", "cls": 3, "bottom": 10},
+                           {"code": "2", "sub": "1", "name": "溶洞", "cls": 3, "bottom": 0}],
                 "holeTypes": [{"name": "控制孔", "count": 2, "depth": 18},
                               {"name": "鉴别孔", "count": 2, "depth": 12}],
                 "coefSoil": ["pipe"], "sample": {"undist": {"count": 6, "device": "hammer", "band": 0},
                                                  "core": 3, "point": 4},
                 "lab": {"items": [{"name": "常规土工样", "unit": "件", "price": 169, "qty": 6}]},
                 "geo": {"wave": {"holes": 1, "depth": 18, "testLen": 15, "method": "single", "byDeepest": True}},
-                "other": {"survey": 1, "kantan": 1, "yanzao": 2, "report": 2},
+                "otherTest": [{"kind": "cpt", "cls": 2, "depth": 15, "tip": "double", "pore": True, "qty": 20},
+                              {"kind": "packer", "sub": "pack_gt20", "qty": 2},
+                              {"kind": "packer", "sub": "inj_hole", "qty": 1}],
+                "coord": {"days": 2, "price": 1000},
+                "other": {"kantan": 1, "yanzao": 2, "report": 2},
+                "survey": {"items": [{"id": "gps_e", "complex": 1, "qty": 4, "price": 0},
+                                     {"id": "terr_500_b", "complex": 1, "qty": 0.05, "price": 0},
+                                     {"id": "tri_2", "complex": 2, "qty": 3, "price": 0}],
+                           "coefs": ["sv_band"]},
             }
             log.append("standards=%d" % len(api.get_standards()["tables"]))
             r = api.export_excel({"state": state, "dir": _st, "filename": "selftest.xlsx"})

@@ -3,10 +3,10 @@
 
 APP_NAME = "工程勘察收费标准计算器"
 APP_EDITION = "2002"
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 APP_AUTHOR = "DK星爷"
 
-# 展示用：v1.0 by DK星爷
+# 展示用：v1.1 by DK星爷
 VERSION_TAG = "v%s by %s" % (APP_VERSION, APP_AUTHOR)
 
 # 窗口 / 页面标题

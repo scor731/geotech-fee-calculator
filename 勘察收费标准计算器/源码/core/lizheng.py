@@ -140,8 +140,9 @@ def _read_access(path):
     try:
         import pyodbc
     except ImportError:
-        raise ValueError("无法读取该 Access 数据库：内置解析器不支持它的结构，且本机没有 pyodbc 组件。\n"
-                         "建议：在理正勘察中「数据输出 / 导出到 Excel」，再把导出的 .xls/.xlsx 拖入本软件。")
+        raise ValueError("无法读取该 Access 数据库：内置解析器未能识别，且本机没有 pyodbc 组件。\n"
+                         + ("原因：" + "；".join(_LZ_LAST) + "\n" if _LZ_LAST else "")
+                         + "建议：在理正勘察中「数据输出 / 导出到 Excel」，再把导出的 .xls/.xlsx 拖入本软件。")
     errs = []
     for drv in ("Microsoft Access Driver (*.mdb, *.accdb)",
                 "Microsoft Access Driver (*.mdb)",
@@ -169,7 +170,9 @@ def _read_access(path):
             except Exception as e:
                 errs.append(str(e))
     raise ValueError("无法打开 Access 数据库（本机可能未安装 Access 数据库引擎）。\n"
-                     "建议：在理正勘察中导出 Excel 后再导入。\n技术信息：" + "; ".join(errs[:2]))
+                     "建议：在理正勘察中导出 Excel 后再导入。\n技术信息："
+                     + "; ".join(errs[:2])
+                     + ("；内置解析器：" + "；".join(_LZ_LAST) if _LZ_LAST else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +190,9 @@ LZ_T_SZ = "z_c_ShuiZhi"
 
 DPT_KIND = {1: "dpt_light", 2: "dpt_heavy", 3: "dpt_super"}
 SAMPLE_KIND = {0: "undist", 1: "disturb", 2: "core", 3: "water"}
+
+# 内置解析器最近一次失败原因：打包缺组件时不再静默回退成「结构不支持」
+_LZ_LAST = []
 
 
 def _fix_text(v):
@@ -228,17 +234,21 @@ def _num(v):
 
 def _parse_access_lizheng(path, name_class=None):
     """读理正备份库；不是理正结构 / 无解析组件时返回 None，交给通用流程。"""
+    del _LZ_LAST[:]
     try:
         from access_parser import AccessParser
-    except ImportError:
+    except Exception as e:
+        _LZ_LAST.append("内置解析组件不可用（%s）" % e)
         return None
     try:
         db = AccessParser(path)
-    except Exception:
+    except Exception as e:
+        _LZ_LAST.append("打开备份库失败（%s）" % e)
         return None
 
     tabs = set(db.catalog.keys())
     if LZ_T_TC not in tabs or LZ_T_ZK not in tabs:
+        _LZ_LAST.append("库内未见理正表 %s / %s" % (LZ_T_ZK, LZ_T_TC))
         return None
 
     log = []

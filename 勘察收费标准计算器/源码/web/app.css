@@ -87,11 +87,30 @@ select.mini{height:30px;border:1px solid var(--line);border-radius:7px;padding:0
 .qrow{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--txt-3);padding:2px 0}
 .qrow b{font-weight:500;color:var(--txt-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 
+/* 左栏各费用占比饼图 */
+.piecard{margin-top:auto;padding:9px 9px 8px;border-radius:9px;
+  background:linear-gradient(165deg,#FFFFFF,#F6F9FE);border:1px solid #E1EBFF}
+.piecard .st{font-size:11.5px;font-weight:600;color:var(--txt-2);margin:0 0 4px;display:flex;align-items:baseline}
+.piecard .st .u{margin-left:auto;font-size:9.5px;font-weight:400;color:var(--txt-3)}
+.pie-wrap{display:flex;align-items:center;gap:7px}
+.pie-wrap .pie{flex:none;width:96px;height:96px}
+.pie-legend{flex:1;min-width:0;display:flex;flex-direction:column;gap:3.5px}
+.pie-legend .li{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--txt-2);line-height:1.3}
+.pie-legend .li i{width:7px;height:7px;border-radius:2px;flex:none}
+.pie-legend .li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pie-legend .li b{font-weight:600;color:var(--txt);font-variant-numeric:tabular-nums;flex:none}
+.pie-empty{font-size:10px;color:var(--txt-3);text-align:center;padding:10px 0}
+
 /* 左栏费用汇总 */
-.sumcard{margin-top:auto;padding:9px 9px 10px;border-radius:9px;
+.sumcard{margin-top:8px;padding:9px 9px 10px;border-radius:9px;
   background:linear-gradient(165deg,#F7FAFF,#EDF3FF);border:1px solid #E1EBFF}
-.sumcard .st{font-size:11.5px;font-weight:600;color:var(--txt-2);margin:0 0 6px}
+.sumcard .st{font-size:11.5px;font-weight:600;color:var(--txt-2);margin:0 0 6px;display:flex;align-items:baseline}
+.sumcard .st .u{margin-left:auto;font-size:9.5px;font-weight:400;color:var(--txt-3)}
 .sumtb{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10.5px}
+.sumtb col.c1{width:37%}
+.sumtb col.c2{width:21%}
+.sumtb col.c3{width:21%}
+.sumtb col.c4{width:21%}
 .sumtb th{font-weight:500;color:var(--txt-3);text-align:left;padding:2px 0 3px;border-bottom:1px solid #DDE7F7}
 .sumtb th.num,.sumtb td.num{text-align:right}
 .sumtb td{padding:2.5px 0;color:var(--txt);font-variant-numeric:tabular-nums;
@@ -111,6 +130,10 @@ select.mini{height:30px;border:1px solid var(--line);border-radius:7px;padding:0
 .sfin{margin-top:7px;padding-top:6px;border-top:1px solid #DDE7F7}
 .sfin span{font-size:10.5px;color:var(--txt-3)}
 .sfin .v{font-size:18px;font-weight:700;color:var(--pri);font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.sumnote{margin-top:5px;font-size:9.5px;line-height:1.45;color:#8A97A6}
+.sunit{display:flex;justify-content:space-between;align-items:baseline;margin-top:5px;padding-top:5px;
+  border-top:1px dashed #DDE7F7;font-size:10.5px;color:var(--txt-3)}
+.sunit b{font-size:12.5px;font-weight:700;color:var(--teal);font-variant-numeric:tabular-nums}
 
 /* 中栏 */
 .center{overflow-y:auto;overflow-x:hidden;padding-right:2px}
@@ -159,6 +182,16 @@ input.cell:focus,select.cell:focus{outline:none;border-color:var(--pri);backgrou
 select.cell{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238A97A6' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 6px center;padding-right:20px;cursor:pointer}
 input.cell.num{text-align:right;font-variant-numeric:tabular-nums}
+/* 标准地层：主层编号 + 亚层编号（均为数字，报告导出时转 ①1） */
+.layerNo{display:flex;align-items:center;gap:2px;justify-content:center}
+.layerNo .sep{flex:none;color:#B7C2D0;font-size:11px}
+input.cell.code{width:36px;flex:none;height:24px;font-size:12px;font-weight:600;text-align:center;padding:0 2px;
+  border:1px dashed var(--line);border-radius:5px;color:var(--txt)}
+input.cell.sub{width:44px;flex:none;height:24px;font-size:11px;text-align:center;padding:0 2px;
+  border:1px dashed var(--line);border-radius:5px;color:var(--txt-2)}
+input.cell.code:hover,input.cell.sub:hover{background:#fff}
+input.cell.code:focus,input.cell.sub:focus{border-style:solid;border-color:var(--pri);background:#fff}
+
 /* 室内试验件数：联动取样的项目可切换「联动 / 手工」 */
 .qtywrap{display:flex;align-items:center;gap:3px}
 .qtywrap input.cell{flex:1;min-width:0}
@@ -170,7 +203,8 @@ input.cell.num{text-align:right;font-variant-numeric:tabular-nums}
   display:grid;place-items:center;font-size:14px;line-height:1}
 .del:hover{background:#FDEDED;color:var(--red)}
 .tag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:5px;
-  font-size:11px;font-weight:600;background:var(--pri-bg);color:var(--pri)}
+  font-size:11px;font-weight:600;background:var(--pri-bg);color:var(--pri);
+  white-space:nowrap;max-width:100%;overflow:hidden;vertical-align:middle}
 .tag.c1{background:#EEF3FB;color:#4C6E9E}
 .tag.c2{background:#E9F5EF;color:#2C7A5B}
 .tag.c3{background:#FDF1E3;color:#A9661C}
@@ -219,7 +253,7 @@ aside.right .rh{padding:10px 12px 0;border-bottom:1px solid var(--line-2)}
 aside.right .rh .t{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
 aside.right .rh .t .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
 aside.right .rh .s{font-size:11px;color:var(--txt-3);margin:2px 0 8px}
-.tabs{display:flex;gap:2px;overflow-x:auto;padding-bottom:0}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:0}
 .tabs button{
   border:0;background:transparent;padding:6px 10px;font-size:11.5px;color:var(--txt-2);cursor:pointer;
   border-bottom:2px solid transparent;white-space:nowrap;border-radius:6px 6px 0 0;transition:.12s;
@@ -310,6 +344,7 @@ aside.right tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
 .toast.err{background:#C84040}
 
 .small{font-size:11px;color:var(--txt-3)}
+span.mini{font-size:10.5px;color:var(--txt-3);line-height:1.45;white-space:nowrap}
 .row{display:flex;align-items:center;gap:8px}
 .mt6{margin-top:6px}.mt10{margin-top:10px}.mt14{margin-top:14px}
 .grow{flex:1}
@@ -330,3 +365,141 @@ aside.right tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
   .top{gap:10px;padding:0 10px}
   .tfield input{min-width:110px !important}
 }
+
+/* 各模块底部的「分部统计」条：实物 / 技术 / 小计 / 比例 / 计入基准价 */
+.secstat{display:flex;flex-wrap:wrap;background:#F2F7FE;border-bottom:1px solid #E1EAF6}
+.secstat .it{flex:1 1 0;min-width:118px;padding:9px 14px;display:flex;flex-direction:column;gap:2px;border-right:1px solid #E3EBF7}
+.secstat .it:last-child{border-right:0}
+.secstat .it .k{font-size:10.5px;color:var(--txt-3)}
+.secstat .it .v{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--txt);line-height:1.35}
+.secstat .it .v .tag{font-size:10px;font-weight:600}
+
+/* 标准地层最后一层：层底留空表示无穷（延伸至孔底） */
+input.cell.inf{color:#7C8B9C;border-style:dashed;font-size:11px;letter-spacing:-.2px}
+input.cell.inf::placeholder{color:#9AA8B8}
+
+/* 工程测量右栏对照表：压缩列宽，避免横向滚动 */
+aside.right table.svtb th,aside.right table.svtb td{padding:5px 4px;font-size:10.5px}
+aside.right table.svtb td:first-child{line-height:1.25}
+
+/* 快捷添加：组合项目 / 单项分组 */
+.pgroup{display:flex;align-items:flex-start;gap:10px;padding:2px 0}
+.pgroup+.pgroup{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line-2)}
+.pgroup .pgl{flex:none;width:56px;padding-top:6px;font-size:11px;font-weight:600;color:var(--txt-3);letter-spacing:.3px}
+.pgroup .row{flex:1;min-width:0}
+
+/* 室内试验明细：加宽项目 / 规格 / 单位列，试验内容完整显示 */
+table.labtb td{padding:4px 6px}
+table.labtb input.cell{font-size:12px}
+table.labtb input.cell.spec{font-size:11.5px;letter-spacing:-.1px}
+input.cell.ctr{text-align:center}
+
+/* 工程测量：横向标签切换类别 + 按收费标准原表的行式录入 */
+.svtabs{display:flex;align-items:flex-end;gap:2px;padding:8px 14px 0;border-bottom:1px solid var(--line-2)}
+.svtabs .tbs{display:flex;gap:2px;min-width:0;flex-wrap:wrap}
+.svtabs .tright{margin-left:auto;display:flex;align-items:center;gap:8px;padding:0 0 5px 12px;flex:none}
+.svtabs .tright .lab{font-size:11px;color:var(--txt-3);white-space:nowrap}
+.svtabs .tright .lab.warn{color:#A9661C;font-weight:600}
+.seg.svseg{background:#FFF8E9;border:1px solid #F2DFBC;padding:2px}
+.seg.svseg button{padding:3px 13px;font-size:11.5px;border-radius:5px;color:#8A6836}
+.seg.svseg button.on{background:#E0A23A;color:#fff;box-shadow:0 1px 3px rgba(180,120,30,.25)}
+.svtabs .tbs button{position:relative;border:0;border-bottom:2px solid transparent;background:transparent;
+  padding:7px 12px 8px;font-size:12.5px;font-weight:500;color:var(--txt-3);cursor:pointer;
+  border-radius:6px 6px 0 0;transition:.15s}
+.svtabs .tbs button:hover{color:var(--txt);background:#F6F9FE}
+.svtabs .tbs button.on{color:var(--pri);font-weight:600;border-bottom-color:var(--pri);background:#F2F7FF}
+.svtabs .tbs button i{display:block;margin-top:1px;font-style:normal;font-size:10px;color:var(--txt-3);font-weight:400}
+.svtabs .tbs button.on i{color:var(--pri)}
+.svbody{padding:0 14px 12px;display:flex;flex-direction:column;gap:12px}
+.svblk{border:1px solid var(--line-2);border-radius:9px;overflow:hidden;background:#fff}
+.svbh{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F7F9FC;border-bottom:1px solid var(--line-2)}
+.svbh b{font-size:12.5px;font-weight:600}
+.svbh .grow{flex:1}
+table.svt{font-size:12px}
+table.svt th{background:#FBFCFE;padding:5px 7px;font-size:11px}
+table.svt td{padding:2px 6px;height:33px}
+table.svt td.nm{color:var(--txt);font-size:12px}
+table.svt td.pickc select.cell{font-weight:500}
+table.svt td.b{font-weight:600}
+table.svt tr.on td{background:#FAFCFF}
+table.svt tfoot td{padding:6px 7px;background:#FAFBFD;color:var(--txt-2);font-size:11.5px;border-top:1px solid var(--line-2)}
+table.svt .dash{display:block;text-align:center;color:#C3CEDC}
+.seg.sm{padding:2px}
+.seg.sm button{padding:3px 10px;font-size:11.5px;border-radius:5px}
+
+/* 复杂程度选择条：放在类别标签下方，提醒「先定档、再填量」 */
+.svpick{display:flex;align-items:center;gap:10px;margin:10px 14px 10px;padding:9px 12px;
+  background:linear-gradient(90deg,#FFF8E9,#FFFDF7 60%,#F4F8FF);border:1px solid #F2DFBC;
+  border-left:3px solid #E0A23A;border-radius:9px}
+.svpick .n{flex:none;width:20px;height:20px;border-radius:50%;background:#E0A23A;color:#fff;
+  font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.svpick .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.svpick .tx b{font-size:12.5px;color:#8A5A16}
+.svpick .tx span{font-size:11px;line-height:1.55;color:#8A6836}
+.svpick .tx span b{font-size:11px;color:#8A5A16}
+.seg.svpickseg{flex:none;background:#fff;border:1px solid #E9D6B4;padding:3px}
+.seg.svpickseg button{padding:5px 16px;font-size:12.5px;border-radius:6px;color:#8A6836}
+.seg.svpickseg button.on{background:#E0A23A;color:#fff;box-shadow:0 1px 3px rgba(180,120,30,.28)}
+
+/* 综合附加系数（各项目组合成后的实际系数） */
+.kcs{display:inline-flex;flex-wrap:wrap;gap:5px;align-items:center}
+.kc{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt-3);
+  background:#F3F6FA;border:1px solid #E6ECF4;border-radius:5px;padding:1px 6px;white-space:nowrap}
+.kc b{font-size:12px;font-weight:600;color:var(--txt-2);font-variant-numeric:tabular-nums}
+.kc.on{background:var(--pri-bg);border-color:#CFE0FF;color:var(--pri)}
+.kc.on b{color:var(--pri)}
+.kv2{font-weight:600;color:var(--pri);background:var(--pri-bg);border-radius:4px;padding:0 5px;margin-left:2px}
+.kv2x{font-size:10px;color:var(--txt-3);font-variant-numeric:tabular-nums;font-weight:400;margin-left:4px}
+
+/* 波速人工录入：每个长度框下面直接显示档位 / 单价 / 金额 */
+.svread{margin-top:6px;padding:5px 7px;background:#F7F9FC;border:1px solid var(--line-2);
+  border-radius:6px;font-size:10.5px;line-height:1.6;color:var(--txt-2);white-space:normal}
+.svread b{color:var(--txt);font-variant-numeric:tabular-nums}
+.svread.wide{margin-top:10px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:7px 11px;font-size:11.5px;line-height:1.5}
+.svread.wide .dot{color:#C3CEDC}
+.svread .tag{font-size:9.5px;padding:1px 5px}
+.svread .mn{color:#A9661C}
+
+/* 右栏工程测量基价表：金额不折行（六位数如 382,875 也能放一行） */
+aside.right table.svtb td.num,aside.right table.svtb th.num{white-space:nowrap}
+aside.right table.svtb td.num{font-size:10px}
+aside.right table.svtb td.ctr{white-space:nowrap;font-size:10px}
+
+/* 右栏复杂程度判定表（表2.2-1 / 2.3-1 / 2.4-1 / 2.5-1） */
+table.cxtb{font-size:10px;table-layout:fixed}
+table.cxtb th{padding:4px 4px;font-size:10px;text-align:center}
+table.cxtb th:first-child{text-align:left;width:52px}
+table.cxtb th.on{color:var(--pri);background:#EEF4FF;font-weight:700}
+table.cxtb td{padding:4px 5px;line-height:1.34;vertical-align:top;border-bottom:1px solid var(--line-2)}
+table.cxtb td:first-child{white-space:nowrap;color:var(--txt-2)}
+table.cxtb td.on{background:#F6FAFF}
+table.cxtb tr:last-child td{border-bottom:0}
+
+/* 小型工程测量不足 3 个组日的自动补足提示 */
+table.svt .bump{font-size:9.5px;color:#A9661C;line-height:1.25;text-align:right;margin-top:-2px}
+/* 系数带来的工程量口径提示（修测按实际修测面积、汇水面积按汇水面积…） */
+table.svt .bump.hintq{color:#2A6FB0;font-size:9px;line-height:1.2;text-align:left;
+  margin-top:2px;white-space:normal;word-break:break-all;max-width:86px;opacity:.9}
+
+/* 标准地层 · 岩土名称下拉（自绘，一次列出全部标准名称） */
+input.cell.nameinp{cursor:pointer}
+input.cell.nameinp:hover{border-color:#C9D4E2;background:#fff}
+.namepop{position:fixed;z-index:40;background:#fff;border:1px solid #D8E2EF;border-radius:10px;
+  box-shadow:0 14px 38px rgba(23,43,77,.18),0 2px 6px rgba(23,43,77,.08);padding:6px;max-height:286px;overflow:auto}
+.namepop[hidden]{display:none}
+.namepop .np-hd{display:flex;align-items:baseline;gap:6px;padding:1px 6px 6px;border-bottom:1px solid var(--line-2);margin-bottom:4px}
+.namepop .np-hd b{font-size:11px;font-weight:600;color:var(--txt-2)}
+.namepop .np-hd span{margin-left:auto;font-size:10px;color:var(--txt-3);white-space:nowrap}
+.namepop .np-list{display:grid;grid-template-columns:1fr 1fr;gap:1px 3px}
+.namepop .np-it{display:flex;align-items:center;gap:5px;width:100%;border:0;background:transparent;
+  padding:5px 7px;border-radius:6px;font-size:12px;color:var(--txt);cursor:pointer;text-align:left;white-space:nowrap}
+.namepop .np-it:hover{background:var(--pri-bg);color:var(--pri)}
+.namepop .np-it.on{background:#EEF4FF;font-weight:600}
+.namepop .np-it .tag{margin-left:auto;height:16px;padding:0 4px;font-size:9.5px;font-weight:600}
+
+/* 附加调整系数：每条系数都注明作用于哪个测量项目 */
+.chk .cn{display:block;min-width:0}
+.chk .cn i.to{display:block;font-style:normal;font-size:10px;line-height:1.35;color:var(--txt-3);margin-top:-1px}
+.chk.on .cn i.to{color:#4C6E9E}
+
